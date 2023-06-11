@@ -18,8 +18,8 @@ public class HexGPUMesh : MonoBehaviour
     [Header("Hex Variables")]
     public Vector2Int size = new Vector2Int(10, 10);
     public const int MAX_LENGTH = 500;
-    private int[] hexIndices = new int[1];
-    private float[] hexHeights = new float[1];
+    private int[] hexIndices = new int[0];
+    private float[] hexHeights = new float[0];
 
     private ComputeBuffer hexIndicesBuffer;
     private ComputeBuffer heightsBuffer;
@@ -31,7 +31,7 @@ public class HexGPUMesh : MonoBehaviour
     
     public Hex.Orientation orientation;
 
-    public Color color;
+    public Color color = Color.white;
     
     GraphicsBuffer verticesBuffer;
     GraphicsBuffer normalsBuffer;
@@ -39,6 +39,8 @@ public class HexGPUMesh : MonoBehaviour
     GraphicsBuffer uvsBuffer;
 
     [Header("Mesh Variables")]
+    public bool updateOnStart = false;
+    public bool randomInitialization = false;
     public Mesh mesh;
     public Mesh collisionMesh;
     public MeshFilter filter;
@@ -46,7 +48,6 @@ public class HexGPUMesh : MonoBehaviour
 
     public ComputeShader computeShader;
     private Bounds meshBounds;
-    public bool updateOnStart = false;
 
     [Header("Textures")]
     public List<Texture2D> textures = new List<Texture2D>();
@@ -119,7 +120,10 @@ public class HexGPUMesh : MonoBehaviour
             hexIndices = new int[numOfHexes];
             for (int i = 0; i < numOfHexes; i++)
             {
-                hexIndices[i] = Random.Range(0, textures.Count + 1);
+                if (randomInitialization)
+                    hexIndices[i] = Random.Range(0, textures.Count + 1);
+                else
+                    hexIndices[i] = 1;
             }
         }
 
@@ -397,13 +401,188 @@ public class HexGPUMesh : MonoBehaviour
 
     public Vector3 HexCenter(Vector2Int position)
     {
-        return Hex.Center(orientation, radius, spacing, 0, position);
+        Vector3 offset = new Vector3(Hex.Width(orientation, radius), Hex.Height(orientation, radius));
+        return Hex.Center(orientation, radius, spacing, 0, position) - offset;
     }
 
     public bool PositionInBounds(Vector2Int position)
     {
         return position.x >= 0 && position.x < size.x && position.y >= 0 && position.y < size.y;
     }
+
+    #region Editing    
+
+    public bool SetIndex(Vector2Int position, int index)
+    {
+        bool changed = false;
+
+        if (PositionInBounds(position))
+        {
+            changed = hexIndices[position.x + position.y * size.x] != index;
+
+            hexIndices[position.x + position.y * size.x] = index;
+        }
+
+        return changed;
+    }
+
+    public bool SetIndicies(Vector2Int[] positions, int index)
+    {
+        bool changed = false;
+        bool c;
+
+        for (int i = 0; i < positions.Length; i++)
+        {
+            c = SetIndex(positions[i], index);
+
+            if (!changed)
+            {
+                changed = c;
+            }
+        }
+
+        return changed;
+    }
+
+    public bool SetIndicies(List<Vector2Int> positions, int index)
+    {
+        bool changed = false;
+        bool c;
+
+        for (int i = 0; i < positions.Count; i++)
+        {
+            c = SetIndex(positions[i], index);
+
+            if (!changed)
+            {
+                changed = c;
+            }
+        }
+
+        return changed;
+    }
+
+    public bool SetTexture(Vector2Int position, Texture2D texture)
+    {
+        bool changed = false;
+
+        int index = textures.IndexOf(texture);
+        if (index == -1)
+        {
+            textures.Add(texture);
+            hexIndices[position.x + position.y * size.x] = textures.Count;
+            changed = true;
+        }
+        else
+        {
+            changed = hexIndices[position.x + position.y * size.x] != index + 1;
+            hexIndices[position.x + position.y * size.x] = index + 1;
+        }
+
+        return changed;
+    }
+
+    public bool SetTextures(Vector2Int[] positions, Texture2D texture)
+    {
+        bool changed = false;
+        bool c;
+
+        for (int i = 0; i < positions.Length; i++)
+        {
+            c = SetTexture(positions[i], texture);
+
+            if (!changed)
+            {
+                changed = c;
+            }
+        }
+
+        return changed;
+    }
+
+    public bool SetTextures(List<Vector2Int> positions, Texture2D texture)
+    {
+        bool changed = false;
+        bool c;
+
+        for (int i = 0; i < positions.Count; i++)
+        {
+            c = SetTexture(positions[i], texture);
+
+            if (!changed)
+            {
+                changed = c;
+            }
+        }
+
+        return changed;
+    }
+
+    public bool SetAllHexIndicies(int index)
+    {
+        bool changed = false;
+        bool c;
+        for (int x = 0; x < size.x; x++)
+        {
+            for (int y = 0; y < size.y; y++)
+            {
+                c = SetIndex(new Vector2Int(x, y), index);
+
+                if (!changed)
+                {
+                    changed = c;
+                }
+            }
+        }
+
+        return changed;
+    }
+
+    public bool SetAllHexTextures(Texture2D texture)
+    {
+        bool changed = false;
+        bool c;
+
+        int index = textures.IndexOf(texture);
+        if (index == -1)
+        {
+            textures.Add(texture);
+
+            for (int x = 0; x < size.x; x++)
+            {
+                for (int y = 0; y < size.y; y++)
+                {
+                    c = SetIndex(new Vector2Int(x, y), textures.Count);
+
+                    if (!changed)
+                    {
+                        changed = c;
+                    }
+                }
+            }
+
+            changed = true;
+        }
+        else
+        {
+            for (int x = 0; x < size.x; x++)
+            {
+                for (int y = 0; y < size.y; y++)
+                {
+                    c = SetIndex(new Vector2Int(x, y), index + 1);
+
+                    if (!changed)
+                    {
+                        changed = c;
+                    }
+                }
+            }
+        }
+
+        return changed;
+    }
+
+    #endregion
 }
 
 public static class Hex
@@ -534,7 +713,7 @@ public static class Hex
         float dist;
         Vector3 center;
         Vector2Int closePos = new Vector2Int(0, 0);
-        int r = 5;
+        int r = 2;
 
         for (int nx = x - r; nx <= x + r; nx++)
         {
@@ -549,6 +728,11 @@ public static class Hex
                 }
             }
         }
+
+        //float q = (Mathf.Sqrt(3) / 3 * worldPoint.x - 1 / 3f * worldPoint.y) / radius;
+        //float p = (2 / 3f * worldPoint.y) / radius;
+
+        //closePos = new Vector2Int(Mathf.RoundToInt(q), Mathf.RoundToInt(p));
 
         return closePos;
     }
@@ -811,7 +995,11 @@ public static class Hex
         List<Vector2Int> list = new List<Vector2Int>();
 
         radius = Mathf.Clamp(radius, 1, MAX_CAL_RADIUS);
-        if (radius > 1)
+        if(radius == 1)
+        {
+            return new Vector2Int[] { center };
+        }        
+        else if (radius > 1)
         {
             Vector2Int ringStart = center;
             for (int i = 0; i < radius - 1; i++)

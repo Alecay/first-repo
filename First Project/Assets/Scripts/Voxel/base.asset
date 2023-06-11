@@ -25,5 +25,16 @@ MonoBehaviour:
     - base:none
     type: 1
     textureMode: 0
+  - id: solid
+    textureIDs:
+    - minecraft:log
+    - minecraft:log
+    - minecraft:log
+    - minecraft:log
+    - minecraft:log
+    - minecraft:log
+    type: 0
+    textureMode: 0
   voxelIDs:
   - air
+  - solid
